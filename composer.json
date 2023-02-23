@@ -1,0 +1,29 @@
+{
+    "name": "hyqo/",
+    "description": "",
+    "keywords": [
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Oleg Sedinkin",
+            "email": "a@aw.wtf"
+        }
+    ],
+    "require": {
+        "php": "^8.2"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Hyqo\\\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Hyqo\\\\Test\\": "tests"
+        }
+    }
+}

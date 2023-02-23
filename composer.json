@@ -1,5 +1,5 @@
 {
-    "name": "hyqo/",
+    "name": "hyqo/cache",
     "description": "",
     "keywords": [
     ],
@@ -18,12 +18,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Hyqo\\\\": "src"
+            "Hyqo\\Cache\\": "src"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Hyqo\\\\Test\\": "tests"
+            "Hyqo\\Cache\\Test\\": "tests"
         }
     }
 }

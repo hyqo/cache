@@ -3,16 +3,22 @@
 namespace Hyqo\Cache\Adapter;
 
 use Hyqo\Cache\CacheItem;
-use Hyqo\Cache\CachePoolInterface;
+use Hyqo\Cache\Contract\ItemInterface;
+use Hyqo\Cache\Contract\PoolInterface;
 
-class RuntimeAdapter implements CachePoolInterface
+class RuntimeAdapter implements PoolInterface
 {
     protected array $storage = [];
 
-    public function hasItem(string $key): bool
+    public function __construct(
+        protected ?int $ttl = null,
+    ) {
+    }
+
+    public function has(string $id): bool
     {
-        if (array_key_exists($key, $this->storage)) {
-            [$expiresAt] = $this->storage[$key];
+        if (array_key_exists($id, $this->storage)) {
+            [$expiresAt] = $this->storage[$id];
 
             if (null === $expiresAt || $expiresAt > time()) {
                 return true;
@@ -22,33 +28,39 @@ class RuntimeAdapter implements CachePoolInterface
         return false;
     }
 
-    public function getItem(string $key, ?callable $handle = null): CacheItem
+    public function get(string $id, ?callable $handle = null): ItemInterface
     {
-        if ($this->hasItem($key)) {
-            [$expiresAt, $value] = $this->storage[$key];
+        if ($this->has($id)) {
+            [$expiresAt, $value] = $this->storage[$id];
 
-            return (new CacheItem($key, true, $value))->expiresAt($expiresAt);
+            return (new CacheItem($id, true))->set($value)->expiresAt($expiresAt);
         }
 
-        $item = new CacheItem($key, false);
+        $item = new CacheItem($id, false);
 
-        null !== $handle && $handle($item);
+        if (null !== $handle) {
+            $item->set($handle($item));
+        }
 
         $this->save($item);
 
         return $item;
     }
 
-    public function delete(string $key): bool
+    public function delete(string $id): bool
     {
-        unset($this->storage[$key]);
+        unset($this->storage[$id]);
 
         return true;
     }
 
-    public function save(CacheItem $item): bool
+    public function save(ItemInterface $item): bool
     {
-        $this->storage[$item->key] = [
+        if (null !== $this->ttl && null === $item->getExpiresAt()) {
+            $item->expiresAfter($this->ttl);
+        }
+
+        $this->storage[$item->getKey()] = [
             $item->getExpiresAt(),
             $item->get(),
         ];

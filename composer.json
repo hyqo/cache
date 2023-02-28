@@ -11,10 +11,12 @@
         }
     ],
     "require": {
-        "php": "^8.2"
+        "php": "^8.2",
+        "hyqo/cache-contract": "^1.0",
+        "hyqo/cache-item": "^1.0"
     },
     "require-dev": {
-        "phpunit/phpunit": "^10.0"
+        "phpunit/phpunit": "^9.6"
     },
     "autoload": {
         "psr-4": {

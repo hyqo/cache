@@ -2,27 +2,21 @@
 
 namespace Hyqo\Cache;
 
-class CacheChainTagAware extends CacheChain implements CachePoolTagAwareInterface
+use Hyqo\Cache\Contract\TagAwarePoolInterface;
+
+class CacheChainTagAware extends CacheChain implements TagAwarePoolInterface
 {
     /**
-     * @var CachePoolTagAwareInterface[]
+     * @var TagAwarePoolInterface[]
      */
     protected array $pools;
 
-    /**
-     * @param CachePoolTagAwareInterface[] $pools
-     */
-    public function __construct(array $pools)
-    {
-        parent::__construct($pools);
-    }
-
-    public function flushTag(string $tag): bool
+    public function flushTag(array $tagIds): bool
     {
         $ok = false;
 
         foreach ($this->pools as $pool) {
-            $ok = $pool->flushTag($tag) || $ok;
+            $ok = $pool->flushTag($tagIds) || $ok;
         }
 
         return $ok;

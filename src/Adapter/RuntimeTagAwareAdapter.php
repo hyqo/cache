@@ -2,69 +2,85 @@
 
 namespace Hyqo\Cache\Adapter;
 
-use Hyqo\Cache\CacheItem;
-use Hyqo\Cache\CachePoolTagAwareInterface;
+use Hyqo\Cache\Contract\ItemInterface;
+use Hyqo\Cache\Contract\TagAwarePoolInterface;
+use Hyqo\Cache\Trait\TagAwarePoolTrait;
 
-class RuntimeTagAwareAdapter extends RuntimeAdapter implements CachePoolTagAwareInterface
+class RuntimeTagAwareAdapter extends RuntimeAdapter implements TagAwarePoolInterface
 {
-    protected array $tags = [];
+    use TagAwarePoolTrait;
+
+    protected array $tagStorage = [];
 
     public function flush(): bool
     {
-        $this->tags = [];
+        $this->tagStorage = [];
 
         return parent::flush();
     }
 
-
-    public function delete(string $key): bool
+    public function delete(string $id): bool
     {
-        $tags = $this->storage[$key][1] ?? [];
+        $tags = $this->storage[$id][1] ?? [];
 
         foreach ($tags as $tag) {
-            if (!array_key_exists($tag, $this->tags)) {
-                continue;
-            }
-
-            $itemTags = &$this->tags[$tag];
-
-            if (false !== $index = array_search($key, $itemTags, true)) {
-                unset($itemTags[$index]);
-
-                if (!count($itemTags)) {
-                    unset($this->tags[$tag]);
-                } else {
-                    $this->tags[$tag] = array_values($itemTags);
-                }
-            }
+            $this->removeItemFromTag($id, $tag);
         }
 
-        return parent::delete($key);
+        return parent::delete($id);
     }
 
-    public function save(CacheItem $item): bool
+    public function save(ItemInterface $item): bool
     {
-        $this->storage[$item->key] = [
+        $newTags = $item->getTags();
+        $oldTags = $this->storage[$item->getKey()][1] ?? [];
+
+        [$addedTags, $removedTags] = $this->diffTags($newTags, $oldTags);
+
+        $this->storage[$item->getKey()] = [
             $item->getExpiresAt(),
             $item->getTags(),
             $item->get(),
         ];
 
-        foreach ($item->getTags() as $tag) {
-            $this->tags[$tag] = array_unique([...($this->tags[$tag] ?? []), $item->key]);
+        foreach ($addedTags as $tag) {
+            $this->tagStorage[$tag] ??= [];
+            $this->tagStorage[$tag][] = $item->getKey();
+        }
+
+        foreach ($removedTags as $tag) {
+            $this->removeItemFromTag($item->getKey(), $tag);
         }
 
         return true;
     }
 
-    public function flushTag(string $tag): bool
+    public function flushTag(array $tagIds): bool
     {
-        if (array_key_exists($tag, $this->tags)) {
-            foreach ($this->tags[$tag] as $key) {
-                $this->delete($key);
+        foreach ($tagIds as $tag) {
+            if (array_key_exists($tag, $this->tagStorage)) {
+                foreach ($this->tagStorage[$tag] as $key) {
+                    $this->delete($key);
+                }
             }
         }
 
         return true;
+    }
+
+    protected function removeItemFromTag(string $id, string $tag): void
+    {
+        if (!array_key_exists($tag, $this->tagStorage)) {
+            return;
+        }
+
+        $this->tagStorage[$tag] = array_filter(
+            $this->tagStorage[$tag],
+            static fn(string $storedId) => $storedId !== $id
+        );
+
+        if(!count($this->tagStorage[$tag])){
+            unset($this->tagStorage[$tag]);
+        }
     }
 }

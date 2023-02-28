@@ -11,8 +11,8 @@ class ImmodestRuntimeTagAwareAdapter extends RuntimeTagAwareAdapter
         return $this->storage;
     }
 
-    public function &tags(): array
+    public function &tagStorage(): array
     {
-        return $this->tags;
+        return $this->tagStorage;
     }
 }

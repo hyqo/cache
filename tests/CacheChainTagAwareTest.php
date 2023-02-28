@@ -27,7 +27,7 @@ class CacheChainTagAwareTest extends TestCase
     protected function mock(): array
     {
         $foo = new ImmodestRuntimeTagAwareAdapter();
-        $bar = new ImmodestRuntimeTagAwareAdapter();
+        $bar = new ImmodestRuntimeTagAwareAdapter(10);
 
         $foo->storage()['k'] = [null, ['tag3'], ''];
         $bar->storage()['k'] = [null, ['tag3'], ''];
@@ -38,12 +38,12 @@ class CacheChainTagAwareTest extends TestCase
         $foo->storage()['abc'] = [null, ['tag1', 'tag2'], 'foo value'];
         $bar->storage()['abc'] = [null, ['tag1', 'tag2'], 'bar value'];
 
-        $foo->tags()['tag1'] = ['expired', 'abc'];
-        $foo->tags()['tag2'] = ['abc'];
-        $foo->tags()['tag3'] = ['k'];
+        $foo->tagStorage()['tag1'] = ['expired', 'abc'];
+        $foo->tagStorage()['tag2'] = ['abc'];
+        $foo->tagStorage()['tag3'] = ['k'];
 
-        $bar->tags()['tag1'] = ['partial', 'expired', 'abc'];
-        $bar->tags()['tag2'] = ['abc'];
+        $bar->tagStorage()['tag1'] = ['partial', 'expired', 'abc'];
+        $bar->tagStorage()['tag2'] = ['abc'];
 
         $chain = new CacheChainTagAware([$foo, $bar]);
 
@@ -62,34 +62,60 @@ class CacheChainTagAwareTest extends TestCase
         $this->assertArrayNotHasKey($key, $foo->storage());
         $this->assertArrayNotHasKey($key, $bar->storage());
 
-        $item = (new CacheItem($key))->set($value)->tag($tags)->tag('tag1');
+        $item = (new CacheItem($key, false))->set($value)->tag($tags)->tag('tag1')->tag('tag2');
 
         $chain->save($item);
 
         $this->assertArrayHasKey($key, $foo->storage());
         $this->assertArrayHasKey($key, $bar->storage());
 
-        $this->assertEquals([$expiresAt, $tags, $value], $foo->storage()[$key]);
-        $this->assertEquals([$expiresAt, $tags, $value], $bar->storage()[$key]);
+        $this->assertEquals([$expiresAt, [...$tags, 'tag2'], $value], $foo->storage()[$key]);
+        $this->assertEquals([$expiresAt, [...$tags, 'tag2'], $value], $bar->storage()[$key]);
 
         $this->assertEquals([
             'tag1' => ['expired', 'abc', 'new'],
-            'tag2' => ['abc'],
+            'tag2' => ['abc', 'new'],
             'tag3' => ['k', 'new'],
-        ], $foo->tags());
+        ], $foo->tagStorage());
 
         $this->assertEquals([
             'tag1' => ['partial', 'expired', 'abc', 'new'],
-            'tag2' => ['abc'],
+            'tag2' => ['abc', 'new'],
             'tag3' => ['new'],
-        ], $bar->tags());
+        ], $bar->tagStorage());
+    }
+
+    public function test_save_tag(): void
+    {
+        [$chain, $foo, $bar] = $this->mock();
+
+        $key = 'abc';
+        $tag = 'tag4';
+
+        $item = (new CacheItem($key, false))->tag($tag);
+
+        $chain->save($item);
+
+        $this->assertEquals([null, [$tag], null], $foo->storage()[$key]);
+        $this->assertEquals([null, [$tag], null], $bar->storage()[$key]);
+
+        $this->assertEquals([
+            'tag1' => ['expired'],
+            'tag3' => ['k'],
+            'tag4' => ['abc'],
+        ], $foo->tagStorage());
+
+        $this->assertEquals([
+            'tag1' => ['partial', 'expired'],
+            'tag4' => ['abc'],
+        ], $bar->tagStorage());
     }
 
     public function test_delete(): void
     {
         [$chain, $foo, $bar] = $this->mock();
 
-        foreach (['partial', 'abc','k'] as $key) {
+        foreach (['partial', 'abc', 'k'] as $key) {
             $chain->delete($key);
             $chain->delete($key);
 
@@ -99,11 +125,7 @@ class CacheChainTagAwareTest extends TestCase
 
         $this->assertEquals([
             'tag1' => ['expired'],
-        ], $foo->tags());
-
-        $this->assertEquals([
-            'tag1' => ['expired'],
-        ], $bar->tags());
+        ], $foo->tagStorage());
     }
 
     public function test_flush(): void
@@ -113,16 +135,16 @@ class CacheChainTagAwareTest extends TestCase
         $this->assertNotEmpty($foo->storage());
         $this->assertNotEmpty($bar->storage());
 
-        $this->assertNotEmpty($foo->tags());
-        $this->assertNotEmpty($bar->tags());
+        $this->assertNotEmpty($foo->tagStorage());
+        $this->assertNotEmpty($bar->tagStorage());
 
         $chain->flush();
 
         $this->assertEmpty($foo->storage());
         $this->assertEmpty($bar->storage());
 
-        $this->assertEmpty($foo->tags());
-        $this->assertEmpty($bar->tags());
+        $this->assertEmpty($foo->tagStorage());
+        $this->assertEmpty($bar->tagStorage());
     }
 
     public function test_flush_tag(): void
@@ -132,13 +154,13 @@ class CacheChainTagAwareTest extends TestCase
         $this->assertNotEmpty($foo->storage());
         $this->assertNotEmpty($bar->storage());
 
-        $chain->flushTag('tag1');
+        $chain->flushTag(['tag1']);
 
         $this->assertEquals([
             'tag3' => ['k'],
-        ], $foo->tags());
+        ], $foo->tagStorage());
 
         $this->assertEquals([
-        ], $bar->tags());
+        ], $bar->tagStorage());
     }
 }

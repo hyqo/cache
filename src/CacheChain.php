@@ -2,17 +2,19 @@
 
 namespace Hyqo\Cache;
 
+use Hyqo\Cache\Contract\ItemInterface;
+use Hyqo\Cache\Contract\PoolInterface;
 use Hyqo\Cache\Exception\CacheException;
 
-class CacheChain implements CachePoolInterface
+class CacheChain implements PoolInterface
 {
     /**
-     * @var CachePoolInterface[]
+     * @var PoolInterface[]
      */
     protected array $pools;
 
     /**
-     * @param CachePoolInterface[] $pools
+     * @param PoolInterface[] $pools
      */
     public function __construct(array $pools)
     {
@@ -23,10 +25,10 @@ class CacheChain implements CachePoolInterface
         $this->pools = $pools;
     }
 
-    public function hasItem(string $key): bool
+    public function has(string $id): bool
     {
         foreach ($this->pools as $pool) {
-            if ($pool->hasItem($key)) {
+            if ($pool->has($id)) {
                 return true;
             }
         }
@@ -34,12 +36,12 @@ class CacheChain implements CachePoolInterface
         return false;
     }
 
-    public function getItem(string $key, ?callable $handle = null): CacheItem
+    public function get(string $id, ?callable $handle = null): CacheItem
     {
         foreach ($this->pools as $i => $pool) {
-            if ($pool->hasItem($key)) {
-                $item = $pool->getItem($key);
+            $item = $pool->get($id);
 
+            if ($item->isHit()) {
                 while (--$i >= 0) {
                     $this->pools[$i]->save(clone $item);
                 }
@@ -48,23 +50,25 @@ class CacheChain implements CachePoolInterface
             }
         }
 
-        $item = new CacheItem($key, false);
+        $item = new CacheItem($id, false);
 
-        null !== $handle && $handle($item);
+        if (null !== $handle) {
+            $item->set($handle($item));
+        }
 
         foreach ($this->pools as $pool) {
-            $pool->save($item);
+            $pool->save(clone $item);
         }
 
         return $item;
     }
 
-    public function delete(string $key): bool
+    public function delete(string $id): bool
     {
         $ok = false;
 
         foreach ($this->pools as $cache) {
-            $ok = $cache->delete($key) || $ok;
+            $ok = $cache->delete($id) || $ok;
         }
 
         return $ok;
@@ -81,10 +85,12 @@ class CacheChain implements CachePoolInterface
         return $ok;
     }
 
-    public function save(CacheItem $item): bool
+    public function save(ItemInterface $item): bool
     {
+        $ok = true;
+
         foreach ($this->pools as $pool) {
-            $pool->save($item);
+            $ok = $pool->save(clone $item) && $ok;
         }
 
         return true;

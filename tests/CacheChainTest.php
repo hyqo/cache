@@ -52,8 +52,8 @@ class CacheChainTest extends TestCase
         $this->assertArrayNotHasKey($key, $foo->storage());
         $this->assertArrayHasKey($key, $bar->storage());
 
-        $this->assertTrue($chain->hasItem($key));
-        $this->assertFalse($chain->hasItem('bar'));
+        $this->assertTrue($chain->has($key));
+        $this->assertFalse($chain->has('bar'));
     }
 
     public function test_get_partial_hit(): void
@@ -66,9 +66,9 @@ class CacheChainTest extends TestCase
         $this->assertArrayNotHasKey($key, $foo->storage());
         $this->assertArrayHasKey($key, $bar->storage());
 
-        $item = $chain->getItem($key);
+        $item = $chain->get($key);
 
-        $this->assertTrue($item->isHit);
+        $this->assertTrue($item->isHit());
         $this->assertEquals($value, $item->get());
         $this->assertArrayHasKey($key, $foo->storage());
         $this->assertEquals([$item->getExpiresAt(), $value], $foo->storage()[$key]);
@@ -85,9 +85,9 @@ class CacheChainTest extends TestCase
         $this->assertArrayNotHasKey($key, $bar->storage());
         $this->assertArrayNotHasKey($key, $foo->storage());
 
-        $item = $chain->getItem($key, fn(CacheItem $item) => $item->set($value)->expiresAt($expiresAt));
+        $item = $chain->get($key, fn(CacheItem $item) => $item->expiresAt($expiresAt)->set($value)->get());
 
-        $this->assertFalse($item->isHit);
+        $this->assertFalse($item->isHit());
         $this->assertEquals($value, $item->get());
 
         $this->assertArrayHasKey($key, $foo->storage());
@@ -113,9 +113,9 @@ class CacheChainTest extends TestCase
         $this->assertEquals([$currentExpiresAt, $currentValue], $foo->storage()[$key]);
         $this->assertEquals([$currentExpiresAt, $currentValue], $bar->storage()[$key]);
 
-        $item = $chain->getItem($key, fn(CacheItem $item) => $item->set($newValue)->expiresAt($newExpiresAt));
+        $item = $chain->get($key, fn(CacheItem $item) => $item->expiresAt($newExpiresAt)->set($newValue)->get());
 
-        $this->assertFalse($item->isHit);
+        $this->assertFalse($item->isHit());
         $this->assertEquals($newValue, $item->get());
 
         $this->assertEquals([$newExpiresAt, $newValue], $foo->storage()[$key]);
@@ -135,9 +135,9 @@ class CacheChainTest extends TestCase
         $this->assertEquals([$expiresAt, 'foo value'], $foo->storage()[$key]);
         $this->assertEquals([$expiresAt, 'bar value'], $bar->storage()[$key]);
 
-        $item = $chain->getItem($key);
+        $item = $chain->get($key);
 
-        $this->assertTrue($item->isHit);
+        $this->assertTrue($item->isHit());
         $this->assertEquals('foo value', $item->get());
     }
 
@@ -152,7 +152,7 @@ class CacheChainTest extends TestCase
         $this->assertArrayNotHasKey($key, $foo->storage());
         $this->assertArrayNotHasKey($key, $bar->storage());
 
-        $item = (new CacheItem($key))->set($value);
+        $item = (new CacheItem($key, false))->set($value);
 
         $chain->save($item);
 

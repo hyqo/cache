@@ -10,18 +10,20 @@ class RuntimeAdapterTest extends TestCase
 {
     public function test_get_miss(): void
     {
-        $pool = new ImmodestRuntimeAdapter();
+        $expiresAt = time()+10;
+        $pool = new ImmodestRuntimeAdapter(10);
 
         $key = 'foo';
         $newValue = 'baz';
 
         $this->assertArrayNotHasKey($key, $pool->storage());
 
-        $item = $pool->getItem($key, fn(CacheItem $item) => $item->set($newValue));
+        $item = $pool->get($key, fn(CacheItem $item) => $newValue);
 
-        $this->assertFalse($item->isHit);
+        $this->assertFalse($item->isHit());
         $this->assertEquals($newValue, $item->get());
+        $this->assertEquals($expiresAt, $item->getExpiresAt());
 
-        $this->assertEquals([null, $newValue], $pool->storage()[$key]);
+        $this->assertEquals([$expiresAt, $newValue], $pool->storage()[$key]);
     }
 }
